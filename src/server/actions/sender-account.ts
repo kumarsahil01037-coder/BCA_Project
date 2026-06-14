@@ -25,55 +25,68 @@ export async function connectSenderAccount(input: {
   host?: string;
   port?: number;
 }) {
-  const user = await requireUser();
-
-  const email = input.email.trim().toLowerCase();
-  const appPassword = input.appPassword.trim().replace(/\s+/g, '');
-  const name = input.name?.trim() || null;
-
-  if (!EMAIL_RE.test(email)) throw new Error('Enter a valid email address');
-  if (!appPassword) throw new Error('App password is required');
-
-  let host: string;
-  let port: number;
-  if (input.provider && input.provider !== 'custom') {
-    ({ host, port } = PROVIDER_PRESETS[input.provider]);
-  } else {
-    host = input.host?.trim() || 'smtp.gmail.com';
-    port = input.port || 465;
-  }
-
-  // Verify the credentials work before saving.
-  const transport = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    requireTLS: port !== 465,
-    auth: { user: email, pass: appPassword },
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-  });
   try {
-    await transport.verify();
-  } catch (err) {
-    const code = (err as { code?: string; command?: string })?.code;
-    console.error('SMTP verify failed:', code, err);
-    if (code === 'ETIMEDOUT' || code === 'ESOCKET' || code === 'ECONNECTION') {
-      throw new Error(`Could not reach ${host}:${port} from the server (network/connection issue: ${code}).`);
+    const user = await requireUser();
+
+    const email = input.email.trim().toLowerCase();
+    const appPassword = input.appPassword.trim().replace(/\s+/g, '');
+    const name = input.name?.trim() || null;
+
+    if (!EMAIL_RE.test(email)) throw new Error('Enter a valid email address');
+    if (!appPassword) throw new Error('App password is required');
+
+    let host: string;
+    let port: number;
+    if (input.provider && input.provider !== 'custom') {
+      ({ host, port } = PROVIDER_PRESETS[input.provider]);
+    } else {
+      host = input.host?.trim() || 'smtp.gmail.com';
+      port = input.port || 465;
     }
-    throw new Error('Could not sign in with that email and app password. Double-check both and try again.');
+
+    // Verify the credentials work before saving.
+    const transport = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      requireTLS: port !== 465,
+      auth: { user: email, pass: appPassword },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
+    });
+    try {
+      await transport.verify();
+    } catch (err) {
+      const code = (err as { code?: string; command?: string })?.code;
+      console.error('[connectSenderAccount] SMTP verify failed:', code, err);
+      if (code === 'ETIMEDOUT' || code === 'ESOCKET' || code === 'ECONNECTION') {
+        throw new Error(`Could not reach ${host}:${port} from the server (network/connection issue: ${code}).`);
+      }
+      throw new Error('Could not sign in with that email and app password. Double-check both and try again.');
+    }
+
+    let encrypted: string;
+    try {
+      encrypted = encrypt(appPassword);
+    } catch (err) {
+      console.error('[connectSenderAccount] encrypt() failed:', err);
+      throw new Error('Server is misconfigured (ENCRYPTION_KEY). Contact the administrator.');
+    }
+
+    await prisma.senderAccount.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, email, name, appPassword: encrypted, host, port },
+      update: { email, name, appPassword: encrypted, host, port },
+    });
+
+    revalidatePath('/settings');
+    revalidatePath('/compose');
+    return { ok: true };
+  } catch (err) {
+    console.error('[connectSenderAccount] failed:', err instanceof Error ? err.stack ?? err.message : err);
+    throw err;
   }
-
-  await prisma.senderAccount.upsert({
-    where: { userId: user.id },
-    create: { userId: user.id, email, name, appPassword: encrypt(appPassword), host, port },
-    update: { email, name, appPassword: encrypt(appPassword), host, port },
-  });
-
-  revalidatePath('/settings');
-  revalidatePath('/compose');
-  return { ok: true };
 }
 
 export async function disconnectSenderAccount() {
