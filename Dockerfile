@@ -70,4 +70,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD curl -fsS http://localhost:3000/api/health || exit 1
 
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+CMD ["node", "server.js"]
