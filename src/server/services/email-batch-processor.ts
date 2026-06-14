@@ -4,10 +4,10 @@ import type { AttachmentInput } from '@/lib/gmail/sender';
 import { sendViaSmtp, createSmtpTransport } from '@/lib/email/smtp-sender';
 import { renderEmail } from '@/lib/email/template-engine';
 import { sleep } from '@/lib/utils';
-import { EmailBatchStatus, EmailStatus, type EmailBatch } from '@prisma/client';
+import { EmailBatchStatus, EmailStatus, type EmailBatch, type EmailLog, type SenderAccount } from '@prisma/client';
 
 const SEND_DELAY_MS = parseInt(process.env.EMAIL_SEND_DELAY_MS ?? '300', 10);
-const CONCURRENCY = 3;
+const CONCURRENCY = 5;
 const MAX_ATTEMPTS = 3;
 
 /**
@@ -80,11 +80,11 @@ export async function runEmailBatch(emailBatchId: string) {
     orderBy: { createdAt: 'asc' },
   });
 
-  const transport = await createSmtpTransport(emailBatch.userId);
+  const { transport, account } = await createSmtpTransport(emailBatch.userId);
   try {
     for (let i = 0; i < pending.length; i += CONCURRENCY) {
       const chunk = pending.slice(i, i + CONCURRENCY);
-      await Promise.all(chunk.map((log) => processOneEmail(log.id, emailBatch, transport)));
+      await Promise.all(chunk.map((log) => processOneEmail(log, emailBatch, transport, account)));
       if (i + CONCURRENCY < pending.length) await sleep(SEND_DELAY_MS);
     }
   } finally {
@@ -117,12 +117,15 @@ export async function runEmailBatch(emailBatchId: string) {
   });
 }
 
-async function processOneEmail(emailId: string, emailBatch: EmailBatch, transport: Transporter) {
-  const log = await prisma.emailLog.findUnique({ where: { id: emailId } });
-  if (!log) return;
-  if (log.status === EmailStatus.SENT) return;
+async function processOneEmail(
+  log: EmailLog,
+  emailBatch: EmailBatch,
+  transport: Transporter,
+  account: SenderAccount,
+) {
+  const emailId = log.id;
 
-  await prisma.emailLog.update({
+  const updated = await prisma.emailLog.update({
     where: { id: emailId },
     data: { status: EmailStatus.SENDING, attempts: { increment: 1 } },
   });
@@ -141,7 +144,7 @@ async function processOneEmail(emailId: string, emailBatch: EmailBatch, transpor
       subject: log.subject,
       html: log.bodyHtml,
       attachments,
-    }, transport);
+    }, transport, account);
 
     await prisma.emailLog.update({
       where: { id: emailId },
@@ -154,9 +157,7 @@ async function processOneEmail(emailId: string, emailBatch: EmailBatch, transpor
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    const current = await prisma.emailLog.findUnique({ where: { id: emailId } });
-    const attempts = current?.attempts ?? 1;
-    const shouldRetry = attempts < MAX_ATTEMPTS;
+    const shouldRetry = updated.attempts < MAX_ATTEMPTS;
     await prisma.emailLog.update({
       where: { id: emailId },
       data: {

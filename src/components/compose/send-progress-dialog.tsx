@@ -91,7 +91,7 @@ export function SendProgressDialog({
           <DialogDescription>
             {isDone
               ? `${sent} of ${total} emails sent successfully${failed > 0 ? `, ${failed} failed` : ''}.`
-              : 'Hang tight — emails are being sent one by one to avoid Gmail rate limits.'}
+              : 'Hang tight — your emails are being sent now.'}
           </DialogDescription>
         </DialogHeader>
 
