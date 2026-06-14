@@ -50,10 +50,18 @@ export async function connectSenderAccount(input: {
     secure: port === 465,
     requireTLS: port !== 465,
     auth: { user: email, pass: appPassword },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   });
   try {
     await transport.verify();
-  } catch {
+  } catch (err) {
+    const code = (err as { code?: string; command?: string })?.code;
+    console.error('SMTP verify failed:', code, err);
+    if (code === 'ETIMEDOUT' || code === 'ESOCKET' || code === 'ECONNECTION') {
+      throw new Error(`Could not reach ${host}:${port} from the server (network/connection issue: ${code}).`);
+    }
     throw new Error('Could not sign in with that email and app password. Double-check both and try again.');
   }
 
