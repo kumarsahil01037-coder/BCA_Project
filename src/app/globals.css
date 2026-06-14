@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 36 32% 93%;
+    --foreground: 250 24% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 250 24% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 250 24% 13%;
+    --primary: 245 82% 64%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 36 26% 88%;
+    --secondary-foreground: 250 24% 13%;
+    --muted: 36 24% 89%;
+    --muted-foreground: 250 10% 45%;
+    --accent: 36 26% 88%;
+    --accent-foreground: 250 24% 13%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 36 18% 84%;
+    --input: 36 18% 84%;
+    --ring: 245 82% 64%;
+    --radius: 1rem;
+
+    /* Meridian accent tones */
+    --ink: 250 28% 11%;
+    --ink-foreground: 36 30% 96%;
+    --sunset: 16 88% 56%;
+    --sunset-foreground: 0 0% 100%;
+  }
+
+  .dark {
+    --background: 250 28% 9%;
+    --foreground: 36 30% 96%;
+    --card: 250 24% 12%;
+    --card-foreground: 36 30% 96%;
+    --popover: 250 24% 12%;
+    --popover-foreground: 36 30% 96%;
+    --primary: 245 85% 68%;
+    --primary-foreground: 250 28% 11%;
+    --secondary: 250 18% 18%;
+    --secondary-foreground: 36 30% 96%;
+    --muted: 250 18% 18%;
+    --muted-foreground: 250 10% 65%;
+    --accent: 250 18% 18%;
+    --accent-foreground: 36 30% 96%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 250 18% 18%;
+    --input: 250 18% 18%;
+    --ring: 245 85% 68%;
+
+    --ink: 250 28% 6%;
+    --ink-foreground: 36 30% 96%;
+    --sunset: 16 88% 56%;
+    --sunset-foreground: 0 0% 100%;
+  }
+
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+  }
+  h1, h2, h3, h4, h5, h6 { @apply font-display; }
+}
+
+/* Tiptap minimal styling */
+.ProseMirror {
+  min-height: 280px;
+  padding: 1rem;
+  outline: none;
+}
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+  height: 0;
+}
+.ProseMirror h1 { @apply text-2xl font-bold my-3; }
+.ProseMirror h2 { @apply text-xl font-bold my-2; }
+.ProseMirror h3 { @apply text-lg font-semibold my-2; }
+.ProseMirror ul { @apply list-disc pl-6 my-2; }
+.ProseMirror ol { @apply list-decimal pl-6 my-2; }
+.ProseMirror a { @apply text-primary underline; }
+.ProseMirror blockquote { @apply border-l-4 border-border pl-4 italic my-2; }
+
+/* Variable chip styling inside editor previews */
+.var-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+}

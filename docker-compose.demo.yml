@@ -1,0 +1,70 @@
+version: '3.9'
+
+# =================================================================
+# DEMO MODE — zero configuration needed
+# Run: docker compose -f docker-compose.demo.yml up --build
+# Open: http://localhost:3000
+# =================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: penarreach
+      POSTGRES_PASSWORD: penarreach
+      POSTGRES_DB: penarreach
+    ports:
+      - '5432:5432'
+    volumes:
+      - penarreach_demo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U penarreach -d penarreach']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # --- Demo mode flag ---
+      DEMO_MODE: '1'
+
+      # --- DB ---
+      DATABASE_URL: postgresql://penarreach:penarreach@db:5432/penarreach?schema=public
+
+      # --- Stubs (not actually used in demo mode, but required to satisfy any code paths) ---
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_demo
+      CLERK_SECRET_KEY: sk_test_demo
+      CLERK_WEBHOOK_SECRET: whsec_demo
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+      NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: /dashboard
+      NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: /dashboard
+
+      # Encryption key is a real 32-byte hex for demo — DO NOT use in production
+      ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+
+      # --- Gmail (won't actually be used until you connect a real account) ---
+      GOOGLE_CLIENT_ID: demo
+      GOOGLE_CLIENT_SECRET: demo
+      GOOGLE_REDIRECT_URI: http://localhost:3000/api/gmail/callback
+
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NODE_ENV: production
+      EMAIL_SEND_DELAY_MS: '1500'
+    ports:
+      - '3000:3000'
+    command: >
+      sh -c "npx prisma migrate deploy 2>/dev/null || npx prisma db push --accept-data-loss &&
+             npx tsx prisma/seed.ts || true &&
+             node server.js"
+
+volumes:
+  penarreach_demo_pgdata:

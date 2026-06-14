@@ -1,0 +1,252 @@
+// ============================================================
+// Penarreach – Prisma Schema
+// PostgreSQL + Prisma ORM
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+// USERS (synced from Clerk via webhook)
+// ------------------------------------------------------------
+enum Role {
+  ADMIN
+  USER
+}
+
+model User {
+  id          String   @id @default(cuid())
+  clerkId     String   @unique
+  email       String   @unique
+  firstName   String?
+  lastName    String?
+  imageUrl    String?
+  role        Role     @default(USER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  gmailAccount  GmailAccount?
+  senderAccount SenderAccount?
+  templates    Template[]
+  emailBatches EmailBatch[]
+  uploads      ExcelUpload[]
+  accounts     Account[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+// ------------------------------------------------------------
+// ALLOWED EMAILS — granted by an admin; only these (plus admins)
+// may use the app once signed in via Clerk.
+// ------------------------------------------------------------
+model AllowedEmail {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  addedBy   String
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// ------------------------------------------------------------
+// ACCOUNT TYPES (e.g. "M&M Type-1", "M&M Type-2") used to tag email batches
+// ------------------------------------------------------------
+model Account {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// ------------------------------------------------------------
+// GMAIL OAUTH CONNECTION
+// Tokens are encrypted at rest (AES-256-GCM)
+// ------------------------------------------------------------
+model GmailAccount {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  email         String
+  accessToken   String   @db.Text     // encrypted
+  refreshToken  String   @db.Text     // encrypted
+  expiresAt     DateTime
+  scope         String   @db.Text
+  tokenType     String   @default("Bearer")
+
+  connectedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ------------------------------------------------------------
+// SENDER ACCOUNT (per-user SMTP credentials)
+// Each user connects their own mailbox (Gmail, Outlook, or any
+// SMTP provider) via an app password, so emails are genuinely
+// sent from their own address. Credentials encrypted at rest
+// (AES-256-GCM).
+// ------------------------------------------------------------
+model SenderAccount {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  email       String
+  name        String?
+  appPassword String   @db.Text // encrypted
+  host        String   @default("smtp.gmail.com")
+  port        Int      @default(465)
+
+  connectedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ------------------------------------------------------------
+// EMAIL TEMPLATES
+// ------------------------------------------------------------
+model Template {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  subject     String
+  bodyHtml    String   @db.Text
+  bodyText    String?  @db.Text
+  toField     String?               // e.g. "<<Email>>"
+  ccField     String?               // e.g. "<<Manager>>, ops@x.com"
+  variables   String[] @default([]) // detected <<placeholders>>
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, name])
+}
+
+// ------------------------------------------------------------
+// EXCEL UPLOADS (recipient data sources)
+// ------------------------------------------------------------
+model ExcelUpload {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fileName    String
+  fileSize    Int
+  rowCount    Int
+  columns     String[]              // detected headers
+  rowsJson    Json                  // parsed rows (array of objects)
+
+  createdAt   DateTime @default(now())
+
+  emailBatches EmailBatch[]
+
+  @@index([userId])
+}
+
+// ------------------------------------------------------------
+// EMAIL BATCH (a bulk send job)
+// ------------------------------------------------------------
+enum EmailBatchStatus {
+  DRAFT
+  QUEUED
+  SENDING
+  PARTIAL
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@map("CampaignStatus")
+}
+
+model EmailBatch {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  uploadId        String?
+  upload          ExcelUpload?     @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+
+  name            String
+  subject         String
+  bodyHtml        String           @db.Text
+  toField         String                                   // "<<Email>>" etc
+  ccField         String?
+  fromEmail       String
+  fromName        String?
+
+  fixedAttachments    Json @default("[]")                 // [{name, url|base64, mime, size}]
+  dynamicAttachmentCol String?                            // Excel column name with file path/url
+
+  status          EmailBatchStatus @default(DRAFT)
+  totalCount      Int              @default(0)
+  sentCount       Int              @default(0)
+  failedCount     Int              @default(0)
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  emails          EmailLog[]
+
+  @@map("Campaign")
+  @@index([userId])
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+// ------------------------------------------------------------
+// EMAIL LOG (individual sends)
+// ------------------------------------------------------------
+enum EmailStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  RETRYING
+}
+
+model EmailLog {
+  id            String      @id @default(cuid())
+  emailBatchId  String      @map("campaignId")
+  emailBatch    EmailBatch  @relation(fields: [emailBatchId], references: [id], onDelete: Cascade)
+
+  to            String
+  cc            String?
+  subject       String
+  bodyHtml      String      @db.Text
+  rowData       Json                            // original Excel row
+  attachments   Json @default("[]")             // resolved attachment list
+
+  status        EmailStatus @default(PENDING)
+  messageId     String?                         // Gmail message id
+  errorMessage  String?     @db.Text
+  attempts      Int         @default(0)
+
+  sentAt        DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([emailBatchId])
+  @@index([emailBatchId, status])
+  @@index([to])
+  @@index([status])
+}

@@ -1,0 +1,21 @@
+node_modules
+.next
+out
+dist
+build
+.env
+.env.local
+.env*.local
+*.log
+.DS_Store
+.vscode
+.idea
+coverage
+*.tsbuildinfo
+next-env.d.ts
+prisma/migrations/dev.db*
+/uploads
+/tmp
+
+# clerk configuration (can include secrets)
+/.clerk/

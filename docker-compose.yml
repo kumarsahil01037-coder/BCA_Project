@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: penarreach-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: penarreach
+      POSTGRES_PASSWORD: penarreach
+      POSTGRES_DB: penarreach
+    ports:
+      - '5432:5432'
+    volumes:
+      - penarreach_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U penarreach -d penarreach']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: penarreach-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://penarreach:penarreach@db:5432/penarreach?schema=public
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      CLERK_WEBHOOK_SECRET: ${CLERK_WEBHOOK_SECRET}
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+      NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: /dashboard
+      NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: /dashboard
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      EMAIL_SEND_DELAY_MS: ${EMAIL_SEND_DELAY_MS:-300}
+      MAX_EMAILS_PER_BATCH: ${MAX_EMAILS_PER_BATCH:-500}
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+
+volumes:
+  penarreach_pgdata:
