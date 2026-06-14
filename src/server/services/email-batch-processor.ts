@@ -80,15 +80,31 @@ export async function runEmailBatch(emailBatchId: string) {
     orderBy: { createdAt: 'asc' },
   });
 
-  const { transport, account } = await createSmtpTransport(emailBatch.userId);
   try {
-    for (let i = 0; i < pending.length; i += CONCURRENCY) {
-      const chunk = pending.slice(i, i + CONCURRENCY);
-      await Promise.all(chunk.map((log) => processOneEmail(log, emailBatch, transport, account)));
-      if (i + CONCURRENCY < pending.length) await sleep(SEND_DELAY_MS);
+    const { transport, account } = await createSmtpTransport(emailBatch.userId);
+    try {
+      for (let i = 0; i < pending.length; i += CONCURRENCY) {
+        const chunk = pending.slice(i, i + CONCURRENCY);
+        await Promise.all(chunk.map((log) => processOneEmail(log, emailBatch, transport, account)));
+        if (i + CONCURRENCY < pending.length) await sleep(SEND_DELAY_MS);
+      }
+    } finally {
+      transport.close();
     }
-  } finally {
-    transport.close();
+  } catch (err) {
+    // Couldn't even start sending (e.g. no sender account configured, or
+    // SMTP connection failed) — fail the whole batch instead of leaving it
+    // stuck in SENDING forever.
+    const message = err instanceof Error ? err.message : 'Failed to send batch';
+    await prisma.emailBatch.update({
+      where: { id: emailBatchId },
+      data: { status: EmailBatchStatus.FAILED, completedAt: new Date() },
+    });
+    await prisma.emailLog.updateMany({
+      where: { emailBatchId, status: { in: [EmailStatus.PENDING, EmailStatus.RETRYING, EmailStatus.SENDING] } },
+      data: { status: EmailStatus.FAILED, errorMessage: message },
+    });
+    return;
   }
 
   // Finalize status
