@@ -50,17 +50,19 @@ ENV HOSTNAME=0.0.0.0
 
 RUN addgroup -g 1001 -S nodejs && adduser -S -u 1001 nextjs
 
+# Full node_modules (incl. the Prisma CLI and its dependency tree, needed
+# for `migrate deploy` at runtime). The standalone copy below overlays its
+# pruned, correctly-versioned deps on top of this.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
+
 # Copy the standalone server and static assets
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma needs the schema, engines, and CLI (for `migrate deploy`) at runtime
+# Prisma schema + generated client (regenerated in the builder stage)
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
 USER nextjs
 EXPOSE 3000
