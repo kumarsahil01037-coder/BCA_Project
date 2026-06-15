@@ -52,15 +52,16 @@ export async function createBrevoSender(email: string, name?: string | null): Pr
 
 /** Returns whether the given Brevo sender id has completed email verification. */
 export async function getBrevoSenderVerified(brevoSenderId: number): Promise<boolean> {
-  const sender = (await brevoFetch(`/senders/${brevoSenderId}`)) as { active: boolean };
-  return sender.active;
+  const result = (await brevoFetch('/senders')) as { senders: { id: number; active: boolean }[] };
+  const match = result.senders.find((s) => s.id === brevoSenderId);
+  return match?.active ?? false;
 }
 
 /** Submits the one-time code Brevo emailed to the sender address to complete verification. */
 export async function validateBrevoSenderOtp(brevoSenderId: number, otp: string): Promise<void> {
   await brevoFetch(`/senders/${brevoSenderId}/validate`, {
     method: 'PUT',
-    body: JSON.stringify({ otp: { name: Number(otp) } }),
+    body: JSON.stringify({ name: Number(otp) }),
   });
 }
 
