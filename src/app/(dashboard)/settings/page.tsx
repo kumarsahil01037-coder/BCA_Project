@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { GmailConnection } from '@/components/settings/gmail-connection';
+import { BrevoSenderDetails } from '@/components/settings/brevo-sender';
 import { AccountTypes } from '@/components/settings/account-types';
 import { FadeIn } from '@/components/motion/fade-in';
 import { prisma } from '@/lib/db/prisma';
@@ -12,10 +12,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [gmailAccount, accounts] = await Promise.all([
-    prisma.gmailAccount.findUnique({
+  const [brevoSender, accounts] = await Promise.all([
+    prisma.brevoSender.findUnique({
       where: { userId: user.id },
-      select: { email: true, connectedAt: true },
+      select: { email: true, name: true, verified: true, connectedAt: true },
     }),
     prisma.account.findMany({ where: { userId: user.id }, orderBy: { name: 'asc' } }),
   ]);
@@ -24,7 +24,7 @@ export default async function SettingsPage() {
     <div className="max-w-3xl space-y-6">
       <FadeIn delay={0}>
         <Suspense>
-          <GmailConnection account={gmailAccount} />
+          <BrevoSenderDetails account={brevoSender} />
         </Suspense>
       </FadeIn>
 

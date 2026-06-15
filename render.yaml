@@ -44,3 +44,5 @@ services:
         value: "300"
       - key: MAX_EMAILS_PER_BATCH
         value: "500"
+      - key: BREVO_API_KEY
+        sync: false

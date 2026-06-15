@@ -43,12 +43,13 @@ export async function createAndQueueEmailBatch(input: ComposeInput) {
   const user = await requireUser();
   const data = composeSchema.parse(input);
 
-  // Require a connected sender (Gmail OAuth or SMTP app password)
-  const [gmailAccount, senderAccount] = await Promise.all([
+  // Require a connected sender (Gmail OAuth, verified Brevo sender, or SMTP app password)
+  const [gmailAccount, brevoSender, senderAccount] = await Promise.all([
     prisma.gmailAccount.findUnique({ where: { userId: user.id } }),
+    prisma.brevoSender.findUnique({ where: { userId: user.id } }),
     prisma.senderAccount.findUnique({ where: { userId: user.id } }),
   ]);
-  if (!gmailAccount && !senderAccount) {
+  if (!gmailAccount && !brevoSender?.verified && !senderAccount) {
     throw new Error('Connect your sender email in Settings before sending');
   }
 
