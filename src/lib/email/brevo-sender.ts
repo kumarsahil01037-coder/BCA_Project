@@ -45,6 +45,11 @@ export async function createBrevoSender(email: string, name?: string | null): Pr
   return created;
 }
 
+/** Removes a sender from the shared Brevo account so reconnecting sends a fresh verification email. */
+export async function deleteBrevoSender(brevoSenderId: number): Promise<void> {
+  await brevoFetch(`/senders/${brevoSenderId}`, { method: 'DELETE' });
+}
+
 /** Returns whether the given Brevo sender id has completed email verification. */
 export async function getBrevoSenderVerified(brevoSenderId: number): Promise<boolean> {
   const result = (await brevoFetch('/senders')) as { senders: { id: number; active: boolean }[] };

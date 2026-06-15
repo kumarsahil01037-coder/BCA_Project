@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/db/prisma';
 import { requireUser } from '@/lib/auth/get-user';
-import { createBrevoSender, getBrevoSenderVerified, validateBrevoSenderOtp } from '@/lib/email/brevo-sender';
+import { createBrevoSender, deleteBrevoSender, getBrevoSenderVerified, validateBrevoSenderOtp } from '@/lib/email/brevo-sender';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -88,6 +88,16 @@ export async function verifyBrevoSenderOtp(otp: string) {
 
 export async function disconnectBrevoSender() {
   const user = await requireUser();
+
+  const account = await prisma.brevoSender.findUnique({ where: { userId: user.id } });
+  if (account) {
+    try {
+      await deleteBrevoSender(account.brevoSenderId);
+    } catch (err) {
+      console.error('[disconnectBrevoSender] Brevo delete failed:', err);
+    }
+  }
+
   await prisma.brevoSender.deleteMany({ where: { userId: user.id } });
   revalidatePath('/settings');
   revalidatePath('/compose');
