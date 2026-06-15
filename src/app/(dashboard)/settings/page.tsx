@@ -2,8 +2,6 @@ import { Suspense } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { SenderDetails } from '@/components/settings/sender-details';
-import { GmailConnection } from '@/components/settings/gmail-connection';
 import { BrevoSenderDetails } from '@/components/settings/brevo-sender';
 import { AccountTypes } from '@/components/settings/account-types';
 import { FadeIn } from '@/components/motion/fade-in';
@@ -14,15 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [sender, gmailAccount, brevoSender, accounts] = await Promise.all([
-    prisma.senderAccount.findUnique({
-      where: { userId: user.id },
-      select: { email: true, name: true, host: true, port: true, connectedAt: true },
-    }),
-    prisma.gmailAccount.findUnique({
-      where: { userId: user.id },
-      select: { email: true, connectedAt: true },
-    }),
+  const [brevoSender, accounts] = await Promise.all([
     prisma.brevoSender.findUnique({
       where: { userId: user.id },
       select: { email: true, name: true, verified: true, connectedAt: true },
@@ -35,18 +25,6 @@ export default async function SettingsPage() {
       <FadeIn delay={0}>
         <Suspense>
           <BrevoSenderDetails account={brevoSender} />
-        </Suspense>
-      </FadeIn>
-
-      <FadeIn delay={0.02}>
-        <Suspense>
-          <GmailConnection account={gmailAccount} />
-        </Suspense>
-      </FadeIn>
-
-      <FadeIn delay={0.04}>
-        <Suspense>
-          <SenderDetails account={sender} />
         </Suspense>
       </FadeIn>
 
