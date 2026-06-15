@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/db/prisma';
 import { requireUser } from '@/lib/auth/get-user';
-import { createBrevoSender, getBrevoSenderVerified } from '@/lib/email/brevo-sender';
+import { createBrevoSender, getBrevoSenderVerified, validateBrevoSenderOtp } from '@/lib/email/brevo-sender';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -61,6 +61,29 @@ export async function refreshBrevoSenderStatus() {
   revalidatePath('/settings');
   revalidatePath('/compose');
   return { verified };
+}
+
+export async function verifyBrevoSenderOtp(otp: string) {
+  const user = await requireUser();
+
+  const account = await prisma.brevoSender.findUnique({ where: { userId: user.id } });
+  if (!account) throw new Error('No sender email pending verification');
+
+  const code = otp.trim();
+  if (!code) throw new Error('Enter the verification code from your email');
+
+  try {
+    await validateBrevoSenderOtp(account.brevoSenderId, code);
+  } catch (err) {
+    console.error('[verifyBrevoSenderOtp] failed:', err);
+    throw new Error('Invalid or expired code. Please check the email and try again.');
+  }
+
+  await prisma.brevoSender.update({ where: { userId: user.id }, data: { verified: true } });
+
+  revalidatePath('/settings');
+  revalidatePath('/compose');
+  return { verified: true };
 }
 
 export async function disconnectBrevoSender() {

@@ -56,6 +56,14 @@ export async function getBrevoSenderVerified(brevoSenderId: number): Promise<boo
   return sender.active;
 }
 
+/** Submits the one-time code Brevo emailed to the sender address to complete verification. */
+export async function validateBrevoSenderOtp(brevoSenderId: number, otp: string): Promise<void> {
+  await brevoFetch(`/senders/${brevoSenderId}/validate`, {
+    method: 'PUT',
+    body: JSON.stringify({ otp }),
+  });
+}
+
 /**
  * Sends via the Brevo transactional email HTTPS API — works on hosts
  * that block outbound SMTP, using the app's shared Brevo account.
