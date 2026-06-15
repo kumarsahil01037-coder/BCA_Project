@@ -6,8 +6,9 @@ export const dynamic = 'force-dynamic';
 
 export default async function ComposePage() {
   const user = await requireUser();
-  const [gmailAccount, sender, templates, accounts] = await Promise.all([
+  const [gmailAccount, brevoSender, sender, templates, accounts] = await Promise.all([
     prisma.gmailAccount.findUnique({ where: { userId: user.id }, select: { email: true } }),
+    prisma.brevoSender.findUnique({ where: { userId: user.id }, select: { email: true, verified: true } }),
     prisma.senderAccount.findUnique({ where: { userId: user.id }, select: { email: true } }),
     prisma.template.findMany({
       where: { userId: user.id },
@@ -32,7 +33,7 @@ export default async function ComposePage() {
         </p>
       </div>
       <ComposeForm
-        fromEmail={gmailAccount?.email ?? sender?.email ?? null}
+        fromEmail={gmailAccount?.email ?? (brevoSender?.verified ? brevoSender.email : null) ?? sender?.email ?? null}
         fromName={[user.firstName, user.lastName].filter(Boolean).join(' ') || null}
         templates={templates.map((t) => ({ ...t, toField: t.toField ?? '<<Email>>' }))}
         accounts={accounts}

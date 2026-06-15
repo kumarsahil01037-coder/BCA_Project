@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { SenderDetails } from '@/components/settings/sender-details';
 import { GmailConnection } from '@/components/settings/gmail-connection';
+import { BrevoSenderDetails } from '@/components/settings/brevo-sender';
 import { AccountTypes } from '@/components/settings/account-types';
 import { FadeIn } from '@/components/motion/fade-in';
 import { prisma } from '@/lib/db/prisma';
@@ -13,7 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  const [sender, gmailAccount, accounts] = await Promise.all([
+  const [sender, gmailAccount, brevoSender, accounts] = await Promise.all([
     prisma.senderAccount.findUnique({
       where: { userId: user.id },
       select: { email: true, name: true, host: true, port: true, connectedAt: true },
@@ -22,12 +23,22 @@ export default async function SettingsPage() {
       where: { userId: user.id },
       select: { email: true, connectedAt: true },
     }),
+    prisma.brevoSender.findUnique({
+      where: { userId: user.id },
+      select: { email: true, name: true, verified: true, connectedAt: true },
+    }),
     prisma.account.findMany({ where: { userId: user.id }, orderBy: { name: 'asc' } }),
   ]);
 
   return (
     <div className="max-w-3xl space-y-6">
       <FadeIn delay={0}>
+        <Suspense>
+          <BrevoSenderDetails account={brevoSender} />
+        </Suspense>
+      </FadeIn>
+
+      <FadeIn delay={0.02}>
         <Suspense>
           <GmailConnection account={gmailAccount} />
         </Suspense>

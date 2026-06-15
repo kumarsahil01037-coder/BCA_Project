@@ -3,9 +3,10 @@ import { prisma } from '@/lib/db/prisma';
 import type { AttachmentInput } from '@/lib/gmail/sender';
 import { sendViaGmail } from '@/lib/gmail/sender';
 import { sendViaSmtp, createSmtpTransport } from '@/lib/email/smtp-sender';
+import { sendViaBrevo } from '@/lib/email/brevo-sender';
 import { renderEmail } from '@/lib/email/template-engine';
 import { sleep } from '@/lib/utils';
-import { EmailBatchStatus, EmailStatus, type EmailBatch, type EmailLog, type SenderAccount } from '@prisma/client';
+import { EmailBatchStatus, EmailStatus, type EmailBatch, type EmailLog, type SenderAccount, type BrevoSender } from '@prisma/client';
 
 const SEND_DELAY_MS = parseInt(process.env.EMAIL_SEND_DELAY_MS ?? '300', 10);
 const CONCURRENCY = 5;
@@ -82,10 +83,15 @@ export async function runEmailBatch(emailBatchId: string) {
   });
 
   try {
-    const gmailAccount = await prisma.gmailAccount.findUnique({ where: { userId: emailBatch.userId } });
+    const [gmailAccount, brevoSender] = await Promise.all([
+      prisma.gmailAccount.findUnique({ where: { userId: emailBatch.userId } }),
+      prisma.brevoSender.findUnique({ where: { userId: emailBatch.userId } }),
+    ]);
     const sender: Sender = gmailAccount
       ? { type: 'gmail' }
-      : { type: 'smtp', ...(await createSmtpTransport(emailBatch.userId)) };
+      : brevoSender?.verified
+        ? { type: 'brevo', account: brevoSender }
+        : { type: 'smtp', ...(await createSmtpTransport(emailBatch.userId)) };
 
     try {
       for (let i = 0; i < pending.length; i += CONCURRENCY) {
@@ -138,7 +144,10 @@ export async function runEmailBatch(emailBatchId: string) {
   });
 }
 
-type Sender = { type: 'gmail' } | { type: 'smtp'; transport: Transporter; account: SenderAccount };
+type Sender =
+  | { type: 'gmail' }
+  | { type: 'brevo'; account: BrevoSender }
+  | { type: 'smtp'; transport: Transporter; account: SenderAccount };
 
 async function processOneEmail(
   log: EmailLog,
@@ -171,7 +180,9 @@ async function processOneEmail(
     const { messageId } =
       sender.type === 'gmail'
         ? await sendViaGmail(sendArgs)
-        : await sendViaSmtp(sendArgs, sender.transport, sender.account);
+        : sender.type === 'brevo'
+          ? await sendViaBrevo({ ...sendArgs, senderEmail: sender.account.email, senderName: sender.account.name })
+          : await sendViaSmtp(sendArgs, sender.transport, sender.account);
 
     await prisma.emailLog.update({
       where: { id: emailId },
