@@ -32,6 +32,13 @@ export async function connectBrevoSender(input: { email: string; name?: string }
     });
   } catch (err) {
     console.error('[connectBrevoSender] failed:', err);
+    const message = err instanceof Error ? err.message : '';
+    if (message.toLowerCase().includes('dmarc')) {
+      const domain = email.split('@')[1];
+      throw new Error(
+        `Your organization's domain (${domain}) has a DMARC policy that blocks new senders until the domain is authenticated. Ask your IT admin to add ${domain} under Senders, Domains & Dedicated IPs in Brevo and verify the SPF/DKIM/DMARC DNS records, then try again.`,
+      );
+    }
     throw new Error('Could not start verification. Please try again in a moment.');
   }
 
