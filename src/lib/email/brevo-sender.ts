@@ -60,7 +60,7 @@ export async function getBrevoSenderVerified(brevoSenderId: number): Promise<boo
 export async function validateBrevoSenderOtp(brevoSenderId: number, otp: string): Promise<void> {
   await brevoFetch(`/senders/${brevoSenderId}/validate`, {
     method: 'PUT',
-    body: JSON.stringify({ otp }),
+    body: JSON.stringify({ otp: { name: Number(otp) } }),
   });
 }
 

@@ -70,7 +70,7 @@ export async function verifyBrevoSenderOtp(otp: string) {
   if (!account) throw new Error('No sender email pending verification');
 
   const code = otp.trim();
-  if (!code) throw new Error('Enter the verification code from your email');
+  if (!/^\d{4,8}$/.test(code)) throw new Error('Enter the numeric verification code from your email');
 
   try {
     await validateBrevoSenderOtp(account.brevoSenderId, code);
