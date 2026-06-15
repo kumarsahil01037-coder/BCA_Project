@@ -1,7 +1,12 @@
 import { SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+
+const DEMO_MODE = process.env.DEMO_MODE === '1' || process.env.DEMO_MODE === 'true';
 
 export default function SignUpPage() {
+  if (DEMO_MODE) redirect('/dashboard');
+
   const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   const looksLikePlaceholder =
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.includes('xxxx') ||

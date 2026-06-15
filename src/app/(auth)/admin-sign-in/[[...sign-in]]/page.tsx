@@ -1,8 +1,13 @@
 import { SignIn } from '@clerk/nextjs';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { ShieldCheck } from 'lucide-react';
 
+const DEMO_MODE = process.env.DEMO_MODE === '1' || process.env.DEMO_MODE === 'true';
+
 export default function AdminSignInPage() {
+  if (DEMO_MODE) redirect('/admin');
+
   const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   const looksLikePlaceholder =
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.includes('xxxx') ||
