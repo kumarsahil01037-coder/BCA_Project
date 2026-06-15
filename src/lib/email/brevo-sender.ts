@@ -26,55 +26,23 @@ async function brevoFetch(path: string, init?: RequestInit) {
 }
 
 /**
- * Registers an email as a sender on the shared Brevo account and triggers
- * Brevo's ownership-verification email. Any leftover sender record for this
- * email (e.g. from before a disconnect was cleaned up on Brevo's side) is
- * removed first, so every Connect click always results in a fresh OTP email.
+ * Brevo requires the technical "From" address to be a sender it has
+ * verified/authenticated. To let users send from *any* address (Gmail,
+ * Outlook, Yahoo, or a company domain — even ones Brevo can't verify due
+ * to DMARC), every message is sent from this single pre-verified address,
+ * with the user's chosen address set as Reply-To and their name as the
+ * display name. Recipients reply straight to the user's real inbox.
  */
-export async function createBrevoSender(email: string, name?: string | null): Promise<{ id: number }> {
-  const existing = (await brevoFetch(`/senders?email=${encodeURIComponent(email)}`)) as {
-    senders: { id: number; email: string }[];
-  };
-  for (const s of existing.senders) {
-    if (s.email.toLowerCase() === email.toLowerCase()) {
-      try {
-        await deleteBrevoSender(s.id);
-      } catch (err) {
-        console.error('[createBrevoSender] failed to remove stale sender:', err);
-      }
-    }
-  }
-
-  const created = (await brevoFetch('/senders', {
-    method: 'POST',
-    body: JSON.stringify({ name: name || email, email }),
-  })) as { id: number };
-  return created;
-}
-
-/** Removes a sender from the shared Brevo account so reconnecting sends a fresh verification email. */
-export async function deleteBrevoSender(brevoSenderId: number): Promise<void> {
-  await brevoFetch(`/senders/${brevoSenderId}`, { method: 'DELETE' });
-}
-
-/** Returns whether the given Brevo sender id has completed email verification. */
-export async function getBrevoSenderVerified(brevoSenderId: number): Promise<boolean> {
-  const result = (await brevoFetch('/senders')) as { senders: { id: number; active: boolean }[] };
-  const match = result.senders.find((s) => s.id === brevoSenderId);
-  return match?.active ?? false;
-}
-
-/** Submits the one-time code Brevo emailed to the sender address to complete verification. */
-export async function validateBrevoSenderOtp(brevoSenderId: number, otp: string): Promise<void> {
-  await brevoFetch(`/senders/${brevoSenderId}/validate`, {
-    method: 'PUT',
-    body: JSON.stringify({ otp: Number(otp) }),
-  });
+function getVerifiedSenderEmail(): string {
+  const email = process.env.BREVO_VERIFIED_SENDER_EMAIL;
+  if (!email) throw new Error('BREVO_VERIFIED_SENDER_EMAIL is not configured on the server');
+  return email;
 }
 
 /**
  * Sends via the Brevo transactional email HTTPS API — works on hosts
- * that block outbound SMTP, using the app's shared Brevo account.
+ * that block outbound SMTP, using the app's shared Brevo account. The
+ * user's chosen email/name appear as the display sender and Reply-To.
  */
 export async function sendViaBrevo(
   args: SendArgs & { senderEmail: string; senderName?: string | null },
@@ -82,7 +50,8 @@ export async function sendViaBrevo(
   const res = (await brevoFetch('/smtp/email', {
     method: 'POST',
     body: JSON.stringify({
-      sender: { email: args.senderEmail, name: args.senderName || undefined },
+      sender: { email: getVerifiedSenderEmail(), name: args.senderName || args.senderEmail },
+      replyTo: { email: args.senderEmail, name: args.senderName || undefined },
       to: [{ email: args.to }],
       cc: args.cc ? [{ email: args.cc }] : undefined,
       subject: args.subject,
