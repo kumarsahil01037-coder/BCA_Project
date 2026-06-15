@@ -87,10 +87,10 @@ export async function runEmailBatch(emailBatchId: string) {
       prisma.gmailAccount.findUnique({ where: { userId: emailBatch.userId } }),
       prisma.brevoSender.findUnique({ where: { userId: emailBatch.userId } }),
     ]);
-    const sender: Sender = gmailAccount
-      ? { type: 'gmail' }
-      : brevoSender?.verified
-        ? { type: 'brevo', account: brevoSender }
+    const sender: Sender = brevoSender?.verified
+      ? { type: 'brevo', account: brevoSender }
+      : gmailAccount
+        ? { type: 'gmail' }
         : { type: 'smtp', ...(await createSmtpTransport(emailBatch.userId)) };
 
     try {

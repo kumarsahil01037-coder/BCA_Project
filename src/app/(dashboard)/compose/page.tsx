@@ -33,7 +33,7 @@ export default async function ComposePage() {
         </p>
       </div>
       <ComposeForm
-        fromEmail={gmailAccount?.email ?? (brevoSender?.verified ? brevoSender.email : null) ?? sender?.email ?? null}
+        fromEmail={(brevoSender?.verified ? brevoSender.email : null) ?? gmailAccount?.email ?? sender?.email ?? null}
         fromName={[user.firstName, user.lastName].filter(Boolean).join(' ') || null}
         templates={templates.map((t) => ({ ...t, toField: t.toField ?? '<<Email>>' }))}
         accounts={accounts}

@@ -38,7 +38,7 @@ export default async function DashboardPage() {
     prisma.template.count({ where: { userId: user.id } }),
   ]);
 
-  const sender = gmailAccount ?? (brevoSender?.verified ? brevoSender : null) ?? senderAccount;
+  const sender = (brevoSender?.verified ? brevoSender : null) ?? gmailAccount ?? senderAccount;
 
   const stats = [
     { label: 'Emails', value: totalEmailBatches, icon: Send },
