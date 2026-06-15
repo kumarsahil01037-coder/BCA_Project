@@ -27,27 +27,22 @@ async function brevoFetch(path: string, init?: RequestInit) {
 
 /**
  * Registers an email as a sender on the shared Brevo account and triggers
- * Brevo's ownership-verification email. If the address is already
- * registered (e.g. reconnecting), reuses the existing sender id.
+ * Brevo's ownership-verification email. Brevo allows multiple sender
+ * entries with the same email, so check for an existing one first and
+ * reuse it instead of creating a duplicate on every reconnect attempt.
  */
 export async function createBrevoSender(email: string, name?: string | null): Promise<{ id: number }> {
-  try {
-    const created = (await brevoFetch('/senders', {
-      method: 'POST',
-      body: JSON.stringify({ name: name || email, email }),
-    })) as { id: number };
-    return created;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : '';
-    if (!message.includes('duplicate_parameter') && !message.includes('already associated')) throw err;
+  const existing = (await brevoFetch(`/senders?email=${encodeURIComponent(email)}`)) as {
+    senders: { id: number; email: string }[];
+  };
+  const match = existing.senders.find((s) => s.email.toLowerCase() === email.toLowerCase());
+  if (match) return { id: match.id };
 
-    const existing = (await brevoFetch(`/senders?email=${encodeURIComponent(email)}`)) as {
-      senders: { id: number; email: string }[];
-    };
-    const match = existing.senders.find((s) => s.email.toLowerCase() === email.toLowerCase());
-    if (!match) throw err;
-    return { id: match.id };
-  }
+  const created = (await brevoFetch('/senders', {
+    method: 'POST',
+    body: JSON.stringify({ name: name || email, email }),
+  })) as { id: number };
+  return created;
 }
 
 /** Returns whether the given Brevo sender id has completed email verification. */
@@ -61,7 +56,7 @@ export async function getBrevoSenderVerified(brevoSenderId: number): Promise<boo
 export async function validateBrevoSenderOtp(brevoSenderId: number, otp: string): Promise<void> {
   await brevoFetch(`/senders/${brevoSenderId}/validate`, {
     method: 'PUT',
-    body: JSON.stringify({ name: Number(otp) }),
+    body: JSON.stringify({ otp: Number(otp) }),
   });
 }
 
