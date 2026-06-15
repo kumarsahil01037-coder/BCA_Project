@@ -33,7 +33,6 @@ model User {
 
   gmailAccount  GmailAccount?
   senderAccount SenderAccount?
-  brevoSender   BrevoSender?
   templates    Template[]
   emailBatches EmailBatch[]
   uploads      ExcelUpload[]
@@ -114,29 +113,6 @@ model SenderAccount {
 
   connectedAt DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  @@index([userId])
-}
-
-// ------------------------------------------------------------
-// BREVO SENDER (per-user verified "from" address, sent via the
-// Brevo HTTPS API using one shared account-level API key). Works
-// from hosts that block outbound SMTP, and requires no OAuth —
-// the user just verifies ownership of their email via a link
-// Brevo emails to them.
-// ------------------------------------------------------------
-model BrevoSender {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  email         String
-  name          String?
-  brevoSenderId Int
-  verified      Boolean  @default(false)
-
-  connectedAt   DateTime @default(now())
-  updatedAt     DateTime @updatedAt
 
   @@index([userId])
 }

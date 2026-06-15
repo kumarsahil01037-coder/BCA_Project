@@ -23,12 +23,11 @@ const statusVariant: Record<string, 'default' | 'success' | 'warning' | 'destruc
 export default async function DashboardPage() {
   const user = await requireUser();
 
-  const [totalEmailBatches, totalSent, totalFailed, gmailAccount, brevoSender, senderAccount, recentEmailBatches, templateCount] = await Promise.all([
+  const [totalEmailBatches, totalSent, totalFailed, gmailAccount, senderAccount, recentEmailBatches, templateCount] = await Promise.all([
     prisma.emailBatch.count({ where: { userId: user.id } }),
     prisma.emailLog.count({ where: { emailBatch: { userId: user.id }, status: 'SENT' } }),
     prisma.emailLog.count({ where: { emailBatch: { userId: user.id }, status: 'FAILED' } }),
     prisma.gmailAccount.findUnique({ where: { userId: user.id }, select: { email: true } }),
-    prisma.brevoSender.findUnique({ where: { userId: user.id }, select: { email: true, verified: true } }),
     prisma.senderAccount.findUnique({ where: { userId: user.id }, select: { email: true } }),
     prisma.emailBatch.findMany({
       where: { userId: user.id },
@@ -38,7 +37,7 @@ export default async function DashboardPage() {
     prisma.template.count({ where: { userId: user.id } }),
   ]);
 
-  const sender = (brevoSender?.verified ? brevoSender : null) ?? gmailAccount ?? senderAccount;
+  const sender = gmailAccount ?? senderAccount;
 
   const stats = [
     { label: 'Emails', value: totalEmailBatches, icon: Send },
