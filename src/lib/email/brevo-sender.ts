@@ -27,16 +27,23 @@ async function brevoFetch(path: string, init?: RequestInit) {
 
 /**
  * Registers an email as a sender on the shared Brevo account and triggers
- * Brevo's ownership-verification email. Brevo allows multiple sender
- * entries with the same email, so check for an existing one first and
- * reuse it instead of creating a duplicate on every reconnect attempt.
+ * Brevo's ownership-verification email. Any leftover sender record for this
+ * email (e.g. from before a disconnect was cleaned up on Brevo's side) is
+ * removed first, so every Connect click always results in a fresh OTP email.
  */
 export async function createBrevoSender(email: string, name?: string | null): Promise<{ id: number }> {
   const existing = (await brevoFetch(`/senders?email=${encodeURIComponent(email)}`)) as {
     senders: { id: number; email: string }[];
   };
-  const match = existing.senders.find((s) => s.email.toLowerCase() === email.toLowerCase());
-  if (match) return { id: match.id };
+  for (const s of existing.senders) {
+    if (s.email.toLowerCase() === email.toLowerCase()) {
+      try {
+        await deleteBrevoSender(s.id);
+      } catch (err) {
+        console.error('[createBrevoSender] failed to remove stale sender:', err);
+      }
+    }
+  }
 
   const created = (await brevoFetch('/senders', {
     method: 'POST',
