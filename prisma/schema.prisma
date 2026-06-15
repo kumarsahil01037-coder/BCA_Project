@@ -119,23 +119,24 @@ model SenderAccount {
 }
 
 // ------------------------------------------------------------
-// BREVO SENDER (per-user "from" address, sent via the Brevo HTTPS
-// API using one shared, pre-verified account-level sender). Works
-// from hosts that block outbound SMTP and requires no OAuth or
-// per-address verification — the user's address/name are used as
-// the display sender and Reply-To on outgoing mail.
+// BREVO SENDER (per-user verified "from" address, sent via the
+// Brevo HTTPS API using one shared account-level API key). Works
+// from hosts that block outbound SMTP, and requires no OAuth —
+// the user just verifies ownership of their email via a link
+// Brevo emails to them.
 // ------------------------------------------------------------
 model BrevoSender {
-  id          String   @id @default(cuid())
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  email       String
-  name        String?
-  verified    Boolean  @default(true)
+  email         String
+  name          String?
+  brevoSenderId Int
+  verified      Boolean  @default(false)
 
-  connectedAt DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  connectedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([userId])
 }

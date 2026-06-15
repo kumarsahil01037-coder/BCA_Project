@@ -46,5 +46,3 @@ services:
         value: "500"
       - key: BREVO_API_KEY
         sync: false
-      - key: BREVO_VERIFIED_SENDER_EMAIL
-        sync: false
