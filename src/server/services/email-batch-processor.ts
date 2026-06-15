@@ -1,6 +1,7 @@
 import type { Transporter } from 'nodemailer';
 import { prisma } from '@/lib/db/prisma';
 import type { AttachmentInput } from '@/lib/gmail/sender';
+import { sendViaGmail } from '@/lib/gmail/sender';
 import { sendViaSmtp, createSmtpTransport } from '@/lib/email/smtp-sender';
 import { renderEmail } from '@/lib/email/template-engine';
 import { sleep } from '@/lib/utils';
@@ -81,15 +82,19 @@ export async function runEmailBatch(emailBatchId: string) {
   });
 
   try {
-    const { transport, account } = await createSmtpTransport(emailBatch.userId);
+    const gmailAccount = await prisma.gmailAccount.findUnique({ where: { userId: emailBatch.userId } });
+    const sender: Sender = gmailAccount
+      ? { type: 'gmail' }
+      : { type: 'smtp', ...(await createSmtpTransport(emailBatch.userId)) };
+
     try {
       for (let i = 0; i < pending.length; i += CONCURRENCY) {
         const chunk = pending.slice(i, i + CONCURRENCY);
-        await Promise.all(chunk.map((log) => processOneEmail(log, emailBatch, transport, account)));
+        await Promise.all(chunk.map((log) => processOneEmail(log, emailBatch, sender)));
         if (i + CONCURRENCY < pending.length) await sleep(SEND_DELAY_MS);
       }
     } finally {
-      transport.close();
+      if (sender.type === 'smtp') sender.transport.close();
     }
   } catch (err) {
     // Couldn't even start sending (e.g. no sender account configured, or
@@ -133,11 +138,12 @@ export async function runEmailBatch(emailBatchId: string) {
   });
 }
 
+type Sender = { type: 'gmail' } | { type: 'smtp'; transport: Transporter; account: SenderAccount };
+
 async function processOneEmail(
   log: EmailLog,
   emailBatch: EmailBatch,
-  transport: Transporter,
-  account: SenderAccount,
+  sender: Sender,
 ) {
   const emailId = log.id;
 
@@ -151,7 +157,7 @@ async function processOneEmail(
 
     const attachments = await resolveAttachments(log.attachments as unknown[]);
 
-    const { messageId } = await sendViaSmtp({
+    const sendArgs = {
       userId: emailBatch.userId,
       from: emailBatch.fromEmail,
       fromName: emailBatch.fromName ?? undefined,
@@ -160,7 +166,12 @@ async function processOneEmail(
       subject: log.subject,
       html: log.bodyHtml,
       attachments,
-    }, transport, account);
+    };
+
+    const { messageId } =
+      sender.type === 'gmail'
+        ? await sendViaGmail(sendArgs)
+        : await sendViaSmtp(sendArgs, sender.transport, sender.account);
 
     await prisma.emailLog.update({
       where: { id: emailId },

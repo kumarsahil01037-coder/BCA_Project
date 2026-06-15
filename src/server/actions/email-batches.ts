@@ -43,9 +43,12 @@ export async function createAndQueueEmailBatch(input: ComposeInput) {
   const user = await requireUser();
   const data = composeSchema.parse(input);
 
-  // Require a connected sender email
-  const sender = await prisma.senderAccount.findUnique({ where: { userId: user.id } });
-  if (!sender) throw new Error('Add your sender email in Settings before sending');
+  // Require a connected sender (Gmail OAuth or SMTP app password)
+  const [gmailAccount, senderAccount] = await Promise.all([
+    prisma.gmailAccount.findUnique({ where: { userId: user.id } }),
+    prisma.senderAccount.findUnique({ where: { userId: user.id } }),
+  ]);
+  if (!gmailAccount && !senderAccount) throw new Error('Connect your sender email in Settings before sending');
 
   const upload = await prisma.excelUpload.findFirst({
     where: { id: data.uploadId, userId: user.id },
