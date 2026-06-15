@@ -26,11 +26,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const content = (
     <html lang="en" suppressHydrationWarning className={`${fraunces.variable} ${inter.variable}`}>
       <body className="min-h-screen bg-background antialiased">
-        {DEMO_MODE && (
-          <div className="bg-amber-500 text-amber-950 text-center text-xs font-medium py-1.5">
-            🎬 DEMO MODE — auth bypassed, all data is local. Set DEMO_MODE=0 in .env to enable real Clerk.
-          </div>
-        )}
         {children}
         <Toaster position="top-right" richColors closeButton />
       </body>
